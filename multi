@@ -1,0 +1,173 @@
+#!/usr/bin/env groovy
+import static System.console
+import static System.currentTimeMillis
+import static AskQuestion.*
+import static Looper.loop
+
+
+ready()
+loop {
+
+  def table = table()
+
+  StopWatch.time() {
+    10.times {
+      ask(new Question(1,10,table))
+        .attempts(3)
+    }
+    printTotals()
+    resetTotals()
+  }
+
+}.until { exit() }
+
+int table() {
+  def answerStr = console().readLine("Which table to practice with? ")
+  if(answerStr && answerStr.isNumber()) {
+   return answerStr.toInteger()
+  }
+  else {
+    return table()
+  }
+}
+
+void ready() {
+  println "Multiplication test"
+  def tryAgain = console().readLine('Ready? ')
+}
+
+boolean exit() {
+  def tryAgain = console().readLine('Try again? ')
+  return "n".equalsIgnoreCase(tryAgain)
+}
+
+class Question {
+
+  final int x
+  final int y
+  final int z
+
+  public Question(int min, int max, int table) {
+    def rand = new Random(currentTimeMillis())
+    x = table ?: rand.nextInt(max+1 - min) + min;
+    y = rand.nextInt(max+1 - min) + min;
+    z = x*y
+  }
+
+  String toString() {
+    "$x x $y ="
+  }
+
+  boolean isCorrect(answer) {
+    z == answer
+  }
+
+  String getResult() {
+    "$x x $y = $z"
+  }
+}
+
+class AskQuestion {
+  static final def CLEAR_LINE = "\33[1A\33[2K"
+  static final def RED = "\u001B[31m"
+  static final def GREEN = "\u001B[32m"
+  static final def YELLOW = "\u001B[33m"
+  static final def WHITE = "\u001B[37m"
+  static final def CROSS = "\u2717"
+  static final def TICK = "\u2713"
+
+   private static int numberOfQuestions = 0;
+   private static int numberOfCorrect = 0;
+   private static int failedAttempts = 0;
+   private Question question
+   private int answer
+
+   static AskQuestion ask(Question question) {
+      AskQuestion.numberOfQuestions++
+      new AskQuestion(question:question)
+   }
+
+   AskQuestion attempts(int maxAttempts) {
+      def attempt = 0
+      loop() {
+        attempt++
+        askQuestion()
+        mark()
+      } until { correct() || attempt >= maxAttempts }
+
+      if(!correct())  {
+        showAnswer()
+      }
+
+      this
+   }
+
+   AskQuestion askQuestion(){
+      def answerStr = console().readLine(question.toString())
+
+      if(answerStr && answerStr.isNumber()) {
+        answer = answerStr.toInteger()
+        this
+      }
+      else {
+        askQuestion()
+      }
+   }
+
+   boolean correct() {
+    return question.isCorrect(answer)
+   }
+
+   void mark() {
+      print(CLEAR_LINE);
+      if (correct()){
+        AskQuestion.numberOfCorrect++
+        println "$GREEN $question $answer $TICK $WHITE"
+      }
+      else {
+        if(answer != -1){
+          AskQuestion.failedAttempts++
+          println "$RED $question $answer $CROSS $WHITE"
+        }
+      }
+   }
+
+   void showAnswer(){
+      println "$YELLOW $question.result $WHITE"
+   }
+
+   static void printTotals() {
+      println "You got $GREEN $AskQuestion.numberOfCorrect/$AskQuestion.numberOfQuestions $WHITE correct and used $AskQuestion.failedAttempts extra attempts"
+   }
+
+   static void resetTotals() {
+      AskQuestion.numberOfCorrect=0
+      AskQuestion.numberOfQuestions=0
+      AskQuestion.failedAttempts=0
+   }
+}
+
+class StopWatch {
+  static time(Closure code){
+    def startTime = currentTimeMillis();
+    code()
+    def endTime = currentTimeMillis();
+    def time = ((endTime - startTime)/1000).setScale(2, BigDecimal.ROUND_HALF_UP)
+    println "you took $time seconds"
+  }
+}
+
+class Looper {
+   private Closure code
+
+   static Looper loop( Closure code ) {
+      new Looper(code:code)
+   }
+
+   void until( Closure test ) {
+      code()
+      while (!test()) {
+         code()
+      }
+   }
+}
